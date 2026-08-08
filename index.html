@@ -72,6 +72,11 @@ function deleteEntry(id){if(!confirm("Delete this entry?"))return;entries=entrie
 function drawCharts(data){let daily={};data.filter(e=>e.type==="expense").forEach(e=>daily[e.date]=(daily[e.date]||0)+e.amount);let labels=Object.keys(daily).sort(),values=labels.map(date=>daily[date]);if(expenseChart)expenseChart.destroy();expenseChart=new Chart(document.getElementById("expenseChart"),{type:"line",data:{labels,datasets:[{label:"Daily Expense",data:values,borderWidth:2,tension:.3}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}});let categories={};data.filter(e=>e.type==="expense").forEach(e=>categories[e.category]=(categories[e.category]||0)+e.amount);if(categoryChart)categoryChart.destroy();categoryChart=new Chart(document.getElementById("categoryChart"),{type:"doughnut",data:{labels:Object.keys(categories),datasets:[{data:Object.values(categories)}]},options:{responsive:true,plugins:{legend:{position:"bottom"}}}})}
 function exportCSV(){if(entries.length===0){alert("No entries to export.");return}let csv="Date,Type,Category,Amount,Note\n";entries.forEach(e=>csv+=`"${e.date}","${e.type}","${e.category}","${e.amount}","${e.note}"\n`);let blob=new Blob([csv],{type:"text/csv"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="SpendTrack.csv";a.click();URL.revokeObjectURL(url)}
 updateDashboard();
+  document.getElementById("category").addEventListener("change", function () {
+  if (this.value === "Salary") {
+    document.getElementById("type").value = "credit";
+  }
+});
 </script>
 </body>
 </html>
