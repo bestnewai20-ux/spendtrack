@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SpendTrack - Expense Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{background:#f4f6fb;color:#172033}
+header{background:#111827;color:white;padding:18px 25px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:22px;font-weight:bold}.logo span{color:#7c6cff}
+header button,.btn{background:#635bff;color:white;border:0;padding:10px 15px;border-radius:8px;cursor:pointer}
+.container{max-width:1200px;margin:auto;padding:25px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
+.top h1{font-size:28px}.top p{color:#737b8c;margin-top:5px}.btn{padding:12px 18px;font-weight:bold}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:20px}
+.card{background:white;padding:20px;border-radius:15px;box-shadow:0 5px 20px rgba(0,0,0,.05)}
+.card p{color:#737b8c;font-size:13px}.card h2{margin-top:10px;font-size:25px}
+.expense{color:#e05252}.credit{color:#15966b}.balance{color:#635bff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.box{background:white;padding:20px;border-radius:15px;box-shadow:0 5px 20px rgba(0,0,0,.05);margin-bottom:20px}
+.box h3{margin-bottom:15px}.form{display:grid;grid-template-columns:1fr 1fr;gap:15px}.form div{display:flex;flex-direction:column}
+.form label{font-size:13px;margin-bottom:6px;color:#697386}input,select,textarea{border:1px solid #ddd;border-radius:8px;padding:11px;outline:none}
+.full{grid-column:1/-1}.form button{grid-column:1/-1}table{width:100%;border-collapse:collapse}
+th,td{padding:12px 8px;border-bottom:1px solid #eee;text-align:left;font-size:13px}th{color:#737b8c}
+.badge{padding:5px 8px;border-radius:20px;font-size:11px;font-weight:bold}.badge.exp{background:#fff0f0;color:#e05252}.badge.cr{background:#eafaf4;color:#15966b}
+.delete{border:0;background:#ffe9e9;color:#d33;padding:6px 9px;border-radius:6px;cursor:pointer}
+.filters{display:flex;gap:10px;margin-bottom:15px}.filters input,.filters select{flex:1}.empty{text-align:center;padding:25px;color:#777}
+@media(max-width:800px){.cards{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}}
+@media(max-width:550px){.container{padding:15px}.top{flex-direction:column;align-items:flex-start;gap:15px}.cards{grid-template-columns:1fr}.form{grid-template-columns:1fr}.filters{flex-direction:column}table{font-size:11px}th,td{padding:8px 4px}}
+</style>
+</head>
+<body>
+<header><div class="logo">Spend<span>Track</span></div><button onclick="exportCSV()">Export CSV</button></header>
+<div class="container">
+<div class="top"><div><h1>Dashboard</h1><p id="today"></p></div><button class="btn" onclick="document.getElementById('addBox').scrollIntoView()">+ Add Entry</button></div>
+<div class="cards">
+<div class="card"><p>Monthly Expense</p><h2 class="expense" id="totalExpense">₹0</h2></div>
+<div class="card"><p>Monthly Credit</p><h2 class="credit" id="totalCredit">₹0</h2></div>
+<div class="card"><p>Monthly Balance</p><h2 class="balance" id="balance">₹0</h2></div>
+<div class="card"><p>Total Entries</p><h2 id="totalEntries">0</h2></div>
+</div>
+<div class="box" id="addBox"><h3>Add New Entry</h3>
+<form class="form" id="entryForm">
+<div><label>Date</label><input type="date" id="date" required></div>
+<div><label>Type</label><select id="type"><option value="expense">Expense</option><option value="credit">Credit</option></select></div>
+<div><label>Category</label><select id="category"><option>Travel</option><option>Food</option><option>Grocery</option><option>Daily Expense</option><option>Shopping</option><option>Bills</option><option>Education</option><option>Health</option><option>Other</option></select></div>
+<div><label>Amount ₹</label><input type="number" id="amount" placeholder="500" required></div>
+<div class="full"><label>Note</label><textarea id="note" placeholder="Example: Dinner, Bus ticket, Grocery..."></textarea></div>
+<button class="btn" type="submit">Save Entry</button>
+</form></div>
+<div class="grid">
+<div class="box"><h3>Expense Overview</h3><canvas id="expenseChart"></canvas></div>
+<div class="box"><h3>Category Breakdown</h3><canvas id="categoryChart"></canvas></div>
+</div>
+<div class="box"><h3>All Entries</h3>
+<div class="filters"><input type="text" id="search" placeholder="Search..." oninput="renderEntries()">
+<select id="filterType" onchange="renderEntries()"><option value="">All</option><option value="expense">Expense</option><option value="credit">Credit</option></select>
+<select id="filterCategory" onchange="renderEntries()"><option value="">All Categories</option><option>Travel</option><option>Food</option><option>Grocery</option><option>Daily Expense</option><option>Shopping</option><option>Bills</option><option>Education</option><option>Health</option><option>Other</option></select></div>
+<div id="table"></div></div>
+</div>
+<script>
+let entries=JSON.parse(localStorage.getItem("spendtrack_entries"))||[];let expenseChart;let categoryChart;
+document.getElementById("date").value=new Date().toISOString().split("T")[0];
+document.getElementById("today").innerText=new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+function save(){localStorage.setItem("spendtrack_entries",JSON.stringify(entries))}
+document.getElementById("entryForm").addEventListener("submit",function(e){e.preventDefault();let entry={id:Date.now(),date:document.getElementById("date").value,type:document.getElementById("type").value,category:document.getElementById("category").value,amount:Number(document.getElementById("amount").value),note:document.getElementById("note").value};entries.unshift(entry);save();this.reset();document.getElementById("date").value=new Date().toISOString().split("T")[0];updateDashboard()});
+function getMonthlyEntries(){let month=new Date().toISOString().slice(0,7);return entries.filter(e=>e.date.startsWith(month))}
+function updateDashboard(){let data=getMonthlyEntries(),expense=0,credit=0;data.forEach(e=>{if(e.type==="expense")expense+=e.amount;if(e.type==="credit")credit+=e.amount});document.getElementById("totalExpense").innerText=formatMoney(expense);document.getElementById("totalCredit").innerText=formatMoney(credit);document.getElementById("balance").innerText=formatMoney(credit-expense);document.getElementById("totalEntries").innerText=data.length;renderEntries();drawCharts(data)}
+function formatMoney(number){return "₹"+number.toLocaleString("en-IN")}
+function renderEntries(){let search=document.getElementById("search").value.toLowerCase(),type=document.getElementById("filterType").value,category=document.getElementById("filterCategory").value,data=getMonthlyEntries().filter(e=>(e.note+" "+e.category).toLowerCase().includes(search)&&(!type||e.type===type)&&(!category||e.category===category));if(data.length===0){document.getElementById("table").innerHTML='<div class="empty">No entries found.</div>';return}let html=`<table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Note</th><th>Amount</th><th>Action</th></tr></thead><tbody>`;data.forEach(e=>{html+=`<tr><td>${e.date}</td><td><span class="badge ${e.type==="expense"?"exp":"cr"}">${e.type}</span></td><td>${e.category}</td><td>${e.note||"-"}</td><td>${formatMoney(e.amount)}</td><td><button class="delete" onclick="deleteEntry(${e.id})">Delete</button></td></tr>`});document.getElementById("table").innerHTML=html+"</tbody></table>"}
+function deleteEntry(id){if(!confirm("Delete this entry?"))return;entries=entries.filter(e=>e.id!==id);save();updateDashboard()}
+function drawCharts(data){let daily={};data.filter(e=>e.type==="expense").forEach(e=>daily[e.date]=(daily[e.date]||0)+e.amount);let labels=Object.keys(daily).sort(),values=labels.map(date=>daily[date]);if(expenseChart)expenseChart.destroy();expenseChart=new Chart(document.getElementById("expenseChart"),{type:"line",data:{labels,datasets:[{label:"Daily Expense",data:values,borderWidth:2,tension:.3}]},options:{responsive:true,scales:{y:{beginAtZero:true}}}});let categories={};data.filter(e=>e.type==="expense").forEach(e=>categories[e.category]=(categories[e.category]||0)+e.amount);if(categoryChart)categoryChart.destroy();categoryChart=new Chart(document.getElementById("categoryChart"),{type:"doughnut",data:{labels:Object.keys(categories),datasets:[{data:Object.values(categories)}]},options:{responsive:true,plugins:{legend:{position:"bottom"}}}})}
+function exportCSV(){if(entries.length===0){alert("No entries to export.");return}let csv="Date,Type,Category,Amount,Note\n";entries.forEach(e=>csv+=`"${e.date}","${e.type}","${e.category}","${e.amount}","${e.note}"\n`);let blob=new Blob([csv],{type:"text/csv"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="SpendTrack.csv";a.click();URL.revokeObjectURL(url)}
+updateDashboard();
+</script>
+</body>
+</html>
